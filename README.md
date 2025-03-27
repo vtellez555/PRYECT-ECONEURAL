@@ -1,1 +1,6 @@
 # PRYECT-ECONEURAL
+##UBICARSE EN LA CARPETA DESTINO DONDE SE GUARDEN LOS ANTERIORES ARCHIVOS .PY Y .HTML , ABRIR NUEVA TERMINAL E INSTALAR LIBRERIAS
+pip install flask 
+pip install flask_cors
+pip install openai 
+pip install datetime

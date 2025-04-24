@@ -12,7 +12,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Configuración para OpenRouter
 client = OpenAI(
@@ -154,6 +160,10 @@ def register_user():
         phone = data.get('phone')
         email = data.get('email')
         password = data.get('password')
+        print("Datos recibidos:", data)
+        print("Teléfono:", phone)
+        print("Email:", email)
+        print("Password:", password)
         
         if not all([phone, email, password]):
             return jsonify({"error": "Todos los campos son requeridos"}), 400
@@ -290,7 +300,15 @@ def check_auth():
 # Rutas de la aplicación
 @app.route('/')
 def home():
-    return send_from_directory('.', 'login_registro.html')
+    return send_from_directory('.', 'login.html')  # Mostrar login como página inicial
+
+@app.route('/login.html')
+def login():
+    return send_from_directory('.', 'login.html')
+
+@app.route('/register.html')
+def register():
+    return send_from_directory('.', 'register.html')
 
 @app.route('/Pagina_principal.html')
 @login_required

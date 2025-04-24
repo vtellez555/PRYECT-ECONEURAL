@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Econeural IA - Panel Principal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2e7d32; /* Verde corporativo */
+            --secondary-color: #558b2f;
+            --accent-color: #7cb342;
+            --dark-color: #1b5e20;
+            --light-color: #f1f8e9;
+            --text-color: #263238;
+            --white: #ffffff;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: var(--text-color);
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--dark-color), var(--primary-color));
+            color: var(--white);
+            padding: 1rem 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .hero {
+            background: url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') no-repeat center center;
+            background-size: cover;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            color: var(--white);
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+        }
+        
+        .chatbot-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 70px;
+            height: 70px;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .chatbot-toggle:hover {
+            background-color: var(--dark-color);
+            transform: scale(1.1);
+        }
+        
+        .chatbot-toggle i {
+            font-size: 28px;
+        }
+        
+        .chatbot-container {
+            position: fixed;
+            bottom: 120px;
+            right: 30px;
+            width: 380px;
+            height: 600px;
+            background-color: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .chatbot-header {
+            background: linear-gradient(135deg, var(--dark-color), var(--primary-color));
+            color: var(--white);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chatbot-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .chatbot-title img {
+            width: 30px;
+            height: 30px;
+        }
+        
+        .chatbot-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 24px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .chatbot-close:hover {
+            transform: rotate(90deg);
+        }
+        
+        .chatbot-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #fafafa;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .user-message {
+            background-color: var(--primary-color);
+            color: var(--white);
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            background-color: #e8f5e9;
+            color: var(--text-color);
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .chatbot-input-container {
+            padding: 15px;
+            background-color: var(--white);
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chatbot-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 24px;
+            outline: none;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+        
+        .chatbot-input:focus {
+            border-color: var(--primary-color);
+        }
+        
+        .chatbot-send {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chatbot-send:hover {
+            background-color: var(--dark-color);
+        }
+        
+        .chatbot-send:disabled {
+            background-color: #bdbdbd;
+            cursor: not-allowed;
+        }
+        
+        .typing-indicator {
+            display: flex;
+            padding: 12px;
+            background-color: #e8f5e9;
+            border-radius: 18px;
+            margin-right: auto;
+            width: fit-content;
+            gap: 6px;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--secondary-color);
+            border-radius: 50%;
+            animation: typingAnimation 1.4s infinite ease-in-out;
+        }
+        
+        @keyframes typingAnimation {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+        
+        .timestamp {
+            font-size: 11px;
+            color: #757575;
+            margin-top: 4px;
+            text-align: right;
+        }
+        
+        @media (max-width: 768px) {
+            .chatbot-container {
+                width: 90%;
+                right: 5%;
+                height: 70vh;
+                bottom: 100px;
+            }
+            
+            .chatbot-toggle {
+                bottom: 20px;
+                right: 20px;
+                width: 60px;
+                height: 60px;
+            }
+        }
+
+        /* Estilos para el botón de logout */
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header con botón de logout -->
+    <header class="header">
+        <div class="container header-content">
+            <div>
+                <h1>Econeural IA</h1>
+                <p>Soluciones Tecnológicas para la Agricultura Moderna</p>
+            </div>
+            <button id="logoutBtn" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+            </button>
+        </div>
+    </header>
+    
+    <!-- Sección Hero -->
+    <section class="hero">
+        <div class="container hero-content">
+            <h2>Transformando la Agricultura con Inteligencia Artificial</h2>
+            <p>Soluciones innovadoras para maximizar tu producción y optimizar recursos</p>
+            <button style="background-color: var(--accent-color); color: white; border: none; padding: 12px 24px; border-radius: 4px; margin-top: 20px; cursor: pointer;">
+                Conoce nuestras soluciones
+            </button>
+        </div>
+    </section>
+    
+    <!-- Contenido principal -->
+    <main class="container" style="padding: 40px 20px;">
+        <section>
+            <h2>Nuestros Servicios</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px;">
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <h3>Monitoreo Inteligente</h3>
+                    <p>Tecnología IoT para el seguimiento en tiempo real de tus cultivos.</p>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <h3>Análisis Predictivo</h3>
+                    <p>Anticipa problemas y optimiza recursos con nuestros modelos predictivos.</p>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                    <h3>Riego Automatizado</h3>
+                    <p>Sistemas inteligentes que ajustan el riego según necesidades del cultivo.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Footer -->
+    <footer style="background-color: var(--dark-color); color: white; padding: 30px 0; margin-top: 50px;">
+        <div class="container">
+            <p>&copy; 2025 Econeural IA. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+    
+    <!-- Botón flotante del chatbot -->
+    <button class="chatbot-toggle" id="chatbotToggle" aria-label="Abrir asistente virtual">
+        <i class="fas fa-robot"></i>
+    </button>
+    
+    <!-- Contenedor del chatbot -->
+    <div class="chatbot-container" id="chatbotContainer">
+        <div class="chatbot-header">
+            <div class="chatbot-title">
+                <i class="fas fa-seedling"></i>
+                <span>Asistente Econeural</span>
+            </div>
+            <button class="chatbot-close" id="chatbotClose">&times;</button>
+        </div>
+        
+        <div class="chatbot-messages" id="chatbotMessages">
+            <div class="bot-message message">
+                ¡Hola! Soy EconeuralBot, tu asistente en soluciones tecnológicas para la agricultura. ¿En qué puedo ayudarte hoy?
+                <div class="timestamp" id="welcomeTimestamp"></div>
+            </div>
+        </div>
+        
+        <div class="chatbot-input-container">
+            <input type="text" class="chatbot-input" id="chatbotInput" placeholder="Escribe tu consulta..." autocomplete="off">
+            <button class="chatbot-send" id="chatbotSend" disabled>
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Verificar autenticación al cargar
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Elementos del DOM
+            const logoutBtn = document.getElementById('logoutBtn');
+            const chatbotToggle = document.getElementById('chatbotToggle');
+            const chatbotClose = document.getElementById('chatbotClose');
+            const chatbotContainer = document.getElementById('chatbotContainer');
+            const chatbotMessages = document.getElementById('chatbotMessages');
+            const chatbotInput = document.getElementById('chatbotInput');
+            const chatbotSend = document.getElementById('chatbotSend');
+            const welcomeTimestamp = document.getElementById('welcomeTimestamp');
+            
+            // Verificar sesión activa
+            try {
+                const response = await fetch('/api/check-auth', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    window.location.href = '/';
+                    return;
+                }
+            } catch (error) {
+                console.error('Error verificando autenticación:', error);
+                window.location.href = '/';
+                return;
+            }
+            
+            // Configurar hora de bienvenida
+            welcomeTimestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            // Botón de logout
+            logoutBtn.addEventListener('click', async function() {
+                try {
+                    const response = await fetch('/api/logout', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    
+                    if (response.ok) {
+                        window.location.href = '/';
+                    }
+                } catch (error) {
+                    console.error('Error al cerrar sesión:', error);
+                }
+            });
+            
+            // Toggle del chatbot
+            chatbotToggle.addEventListener('click', function() {
+                const isVisible = chatbotContainer.style.display === 'flex';
+                chatbotContainer.style.display = isVisible ? 'none' : 'flex';
+                chatbotToggle.innerHTML = isVisible ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-times"></i>';
+                
+                if (!isVisible) {
+                    chatbotInput.focus();
+                }
+            });
+            
+            chatbotClose.addEventListener('click', function() {
+                chatbotContainer.style.display = 'none';
+                chatbotToggle.innerHTML = '<i class="fas fa-robot"></i>';
+            });
+            
+            // Enviar mensaje con Enter
+            chatbotInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && chatbotInput.value.trim()) {
+                    sendMessage();
+                }
+            });
+            
+            // Enviar mensaje con botón
+            chatbotSend.addEventListener('click', function() {
+                if (chatbotInput.value.trim()) {
+                    sendMessage();
+                }
+            });
+            
+            // Habilitar/deshabilitar botón de enviar
+            chatbotInput.addEventListener('input', function() {
+                chatbotSend.disabled = !this.value.trim();
+            });
+            
+            // Función para enviar mensajes al chatbot
+            async function sendMessage() {
+                const message = chatbotInput.value.trim();
+                if (!message) return;
+                
+                // Mostrar mensaje del usuario
+                addMessage(message, 'user');
+                chatbotInput.value = '';
+                chatbotSend.disabled = true;
+                
+                try {
+                    // Mostrar indicador de "escribiendo"
+                    const typingIndicator = createTypingIndicator();
+                    chatbotMessages.appendChild(typingIndicator);
+                    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+                    
+                    // Enviar mensaje al backend
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ message: message }),
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Eliminar indicador y mostrar respuesta
+                    chatbotMessages.removeChild(typingIndicator);
+                    addMessage(data.response, 'bot');
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    chatbotMessages.querySelector('.typing-indicator')?.remove();
+                    addMessage('Lo siento, hubo un error al procesar tu mensaje. Por favor intenta nuevamente.', 'bot', true);
+                }
+            }
+            
+            // Función para agregar mensajes al chat
+            function addMessage(text, sender, isError = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `${sender}-message message`;
+                
+                if (isError) {
+                    messageDiv.style.color = '#d32f2f';
+                    messageDiv.style.fontWeight = '500';
+                }
+                
+                messageDiv.innerHTML = `
+                    ${escapeHtml(text)}
+                    <div class="timestamp">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                `;
+                
+                chatbotMessages.appendChild(messageDiv);
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+            }
+            
+            // Crear indicador de "escribiendo"
+            function createTypingIndicator() {
+                const div = document.createElement('div');
+                div.className = 'typing-indicator';
+                div.innerHTML = `
+                    <div class="typing-dot" style="animation-delay: 0s"></div>
+                    <div class="typing-dot" style="animation-delay: 0.2s"></div>
+                    <div class="typing-dot" style="animation-delay: 0.4s"></div>
+                `;
+                return div;
+            }
+            
+            // Escapar HTML para seguridad
+            function escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+        });
+    </script>
+</body>
+</html>

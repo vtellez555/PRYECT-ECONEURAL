@@ -6,10 +6,11 @@ import random
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import csv
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import psycopg2
+from psycopg2 import sql
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -23,7 +24,7 @@ CORS(app, resources={
 # Configuración para OpenRouter
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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"
+    api_key="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"
 )
 
 # Configuración de correo electrónico
@@ -34,11 +35,6 @@ EMAIL_CONFIG = {
     'smtp_port': 587,
     'company_name': 'Econeural IA'
 }
-
-# Archivos de almacenamiento
-USERS_FILE = 'users.csv'
-TEMP_VERIFICATIONS_FILE = 'temp_verifications.csv'
-SESSION_FILE = 'active_sessions.csv'
 
 # Contexto del chatbot
 CHATBOT_CONTEXT = """
@@ -52,24 +48,86 @@ Debes seguir estas reglas:
 5. Limitar respuestas a 300 palabras máximo
 """
 
-# Inicialización de archivos
-def init_files():
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['phone', 'email', 'password_hash', 'verified', 'registration_date'])
-    
-    if not os.path.exists(TEMP_VERIFICATIONS_FILE):
-        with open(TEMP_VERIFICATIONS_FILE, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['phone', 'email', 'password', 'verification_code', 'timestamp'])
-    
-    if not os.path.exists(SESSION_FILE):
-        with open(SESSION_FILE, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['session_id', 'email', 'login_time'])
+# Conexión a PostgreSQL
 
-# Función para enviar correos
+def load_env(env_file='data_base_registros.env'):
+    """Lee el archivo .env"""
+    config = {}
+    try:
+        with open(env_file, 'r') as f:
+            for line in f:
+                if line.strip() and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    config[key] = value
+        return config
+    except Exception as e:
+        print(f"Error leyendo .env: {e}")
+        return None
+    
+def get_db_connection():
+    config = load_env()
+    if not config:
+        return None
+
+    try:
+        conn = psycopg2.connect(
+            dbname=config.get('DB_NAME'),
+            user=config.get('DB_USER'),
+            password=config.get('DB_PASSWORD'),
+            host=config.get('DB_HOST'),
+            port=config.get('DB_PORT')
+        )
+        print("✅ Conexión exitosa a PostgreSQL!")
+        return conn
+    except psycopg2.Error as e:
+        print(f" Error de conexión: {e}")
+        return None
+
+# Inicialización de la base de datos
+def init_db():
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                # Crear tabla de usuarios si no existe
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        phone VARCHAR(20),
+                        email VARCHAR(255) PRIMARY KEY,
+                        password_hash VARCHAR(255),
+                        verified BOOLEAN,
+                        registration_date TIMESTAMP
+                    )
+                """)
+                
+                # Crear tabla de verificaciones temporales
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS temp_verifications (
+                        phone VARCHAR(20),
+                        email VARCHAR(255),
+                        password VARCHAR(255),
+                        verification_code VARCHAR(6),
+                        timestamp TIMESTAMP
+                    )
+                """)
+                
+                # Crear tabla de sesiones activas
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS active_sessions (
+                        session_id VARCHAR(50) PRIMARY KEY,
+                        email VARCHAR(255),
+                        login_time TIMESTAMP
+                    )
+                """)
+                
+                conn.commit()
+            print("✅ Tablas creadas/existen en PostgreSQL!")
+        except psycopg2.Error as e:
+            print(f"Error al crear tablas: {e}")
+        finally:
+            conn.close()
+
+# Función para enviar correos 
 def send_verification_email(email, code):
     try:
         msg = MIMEMultipart('alternative')
@@ -83,7 +141,7 @@ def send_verification_email(email, code):
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
                     <h2 style="color: #2c3e50;">Verificación de cuenta</h2>
                     <p>Tu código de verificación es:</p>
-                    <div style="background-color: #f8f9fa; padding: 15px; text-align: center; margin: 20px 0; 
+                    <div style= background-color: #f8f9fa; padding: 15px; text-align: center; margin: 20px 0; 
                                 border-radius: 5px; font-size: 24px; font-weight: bold; color: #2c3e50;">
                         {code}
                     </div>
@@ -121,38 +179,57 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Manejo de sesiones
+# Manejo de sesiones (ahora con PostgreSQL)
 def create_session(email):
     session_id = generate_password_hash(f"{email}{datetime.now().timestamp()}")[:50]
-    with open(SESSION_FILE, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([session_id, email, datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
-    return session_id
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO active_sessions (session_id, email, login_time) VALUES (%s, %s, %s)",
+                    (session_id, email, datetime.now())
+                )
+                conn.commit()
+            return session_id
+        except psycopg2.Error as e:
+            print(f"Error al crear sesión: {e}")
+        finally:
+            conn.close()
+    return None
 
 def validate_session(session_id):
-    if not os.path.exists(SESSION_FILE):
-        return False
-        
-    with open(SESSION_FILE, mode='r') as file:
-        reader = csv.reader(file)
-        next(reader)
-        for session in reader:
-            if len(session) > 0 and session[0] == session_id:
-                return True
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM active_sessions WHERE session_id = %s",
+                    (session_id,)
+                )
+                return cur.fetchone() is not None
+        except psycopg2.Error as e:
+            print(f"Error al validar sesión: {e}")
+        finally:
+            conn.close()
     return False
 
 def delete_session(session_id):
-    if os.path.exists(SESSION_FILE):
-        with open(SESSION_FILE, mode='r') as file:
-            sessions = list(csv.reader(file))
-        
-        updated_sessions = [s for s in sessions if len(s) > 0 and s[0] != session_id]
-        
-        with open(SESSION_FILE, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(updated_sessions)
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM active_sessions WHERE session_id = %s",
+                    (session_id,)
+                )
+                conn.commit()
+        except psycopg2.Error as e:
+            print(f"Error al eliminar sesión: {e}")
+        finally:
+            conn.close()
 
-# Rutas de autenticación
+# Rutas de autenticación (modificadas para PostgreSQL)
 @app.route('/api/register', methods=['POST'])
 def register_user():
     try:
@@ -160,10 +237,6 @@ def register_user():
         phone = data.get('phone')
         email = data.get('email')
         password = data.get('password')
-        print("Datos recibidos:", data)
-        print("Teléfono:", phone)
-        print("Email:", email)
-        print("Password:", password)
         
         if not all([phone, email, password]):
             return jsonify({"error": "Todos los campos son requeridos"}), 400
@@ -171,28 +244,41 @@ def register_user():
         if len(password) < 8:
             return jsonify({"error": "La contraseña debe tener al menos 8 caracteres"}), 400
         
-        if os.path.exists(USERS_FILE):
-            with open(USERS_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                next(reader)
-                for user in reader:
-                    if len(user) > 1 and user[1] == email:
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT 1 FROM users WHERE email = %s",
+                        (email,)
+                    )
+                    if cur.fetchone():
                         return jsonify({"error": "Este correo ya está registrado"}), 400
+            except psycopg2.Error as e:
+                print(f"Error al verificar usuario existente: {e}")
+                return jsonify({"error": "Error interno del servidor"}), 500
+            finally:
+                conn.close()
         
         verification_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
         
         if not send_verification_email(email, verification_code):
             return jsonify({"error": "Error al enviar código de verificación"}), 500
         
-        with open(TEMP_VERIFICATIONS_FILE, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([
-                phone, 
-                email, 
-                password, 
-                verification_code,
-                datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            ])
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO temp_verifications (phone, email, password, verification_code, timestamp) VALUES (%s, %s, %s, %s, %s)",
+                        (phone, email, password, verification_code, datetime.now())
+                    )
+                    conn.commit()
+            except psycopg2.Error as e:
+                print(f"Error al guardar verificación temporal: {e}")
+                return jsonify({"error": "Error interno del servidor"}), 500
+            finally:
+                conn.close()
         
         return jsonify({
             "success": True, 
@@ -213,43 +299,54 @@ def verify_user():
         if not email or not code:
             return jsonify({"error": "Correo y código son requeridos"}), 400
         
-        temp_users = []
-        if os.path.exists(TEMP_VERIFICATIONS_FILE):
-            with open(TEMP_VERIFICATIONS_FILE, mode='r') as file:
-                reader = csv.reader(file)
-                temp_users = list(reader)
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    # Buscar en verificaciones temporales
+                    cur.execute(
+                        "SELECT phone, email, password, verification_code, timestamp FROM temp_verifications WHERE email = %s AND verification_code = %s",
+                        (email, code)
+                    )
+                    user_data = cur.fetchone()
+                    
+                    if user_data:
+                        phone, email, password, verification_code, reg_time = user_data
+                        
+                        if (datetime.now() - reg_time).total_seconds() > 600:
+                            return jsonify({"error": "Código expirado"}), 400
+                        
+                        # Registrar usuario en la tabla principal
+                        cur.execute(
+                            "INSERT INTO users (phone, email, password_hash, verified, registration_date) VALUES (%s, %s, %s, %s, %s)",
+                            (phone, email, generate_password_hash(password), True, datetime.now())
+                        )
+                        
+                        # Eliminar de verificaciones temporales
+                        cur.execute(
+                            "DELETE FROM temp_verifications WHERE email = %s",
+                            (email,)
+                        )
+                        
+                        conn.commit()
+                        
+                        session_id = create_session(email)
+                        response = jsonify({
+                            "success": True, 
+                            "message": "Cuenta verificada",
+                            "redirect": "/Pagina_principal.html"
+                        })
+                        response.set_cookie('session_id', session_id, httponly=True)
+                        return response
+                    
+                    return jsonify({"error": "Código inválido"}), 400
+            except psycopg2.Error as e:
+                print(f"Error al verificar usuario: {e}")
+                return jsonify({"error": "Error interno del servidor"}), 500
+            finally:
+                conn.close()
         
-        for user in temp_users:
-            if len(user) >= 4 and user[1] == email and user[3] == code:
-                reg_time = datetime.strptime(user[4], '%Y-%m-%d %H:%M:%S') if len(user) > 4 else datetime.now()
-                if (datetime.now() - reg_time).total_seconds() > 600:
-                    return jsonify({"error": "Código expirado"}), 400
-                
-                with open(USERS_FILE, mode='a', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerow([
-                        user[0],  # phone
-                        user[1],  # email
-                        generate_password_hash(user[2]),  # password hash
-                        True,  # verified
-                        datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    ])
-                
-                updated_temp = [u for u in temp_users if u[1] != email]
-                with open(TEMP_VERIFICATIONS_FILE, mode='w', newline='') as file:
-                    writer = csv.writer(file)
-                    writer.writerows(updated_temp)
-                
-                session_id = create_session(email)
-                response = jsonify({
-                    "success": True, 
-                    "message": "Cuenta verificada",
-                    "redirect": "/Pagina_principal.html"
-                })
-                response.set_cookie('session_id', session_id, httponly=True)
-                return response
-        
-        return jsonify({"error": "Código inválido"}), 400
+        return jsonify({"error": "Error de conexión a la base de datos"}), 500
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -261,24 +358,37 @@ def login_user():
         email = data.get('email')
         password = data.get('password')
         
-        with open(USERS_FILE, mode='r') as file:
-            reader = csv.reader(file)
-            next(reader)
-            for user in reader:
-                if len(user) >= 3 and user[1] == email and check_password_hash(user[2], password):
-                    if user[3] != 'True':
-                        return jsonify({"error": "Cuenta no verificada"}), 403
+        conn = get_db_connection()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT email, password_hash, verified FROM users WHERE email = %s",
+                        (email,)
+                    )
+                    user = cur.fetchone()
                     
-                    session_id = create_session(email)
-                    response = jsonify({
-                        "success": True,
-                        "message": "Autenticación exitosa",
-                        "redirect": "/Pagina_principal.html"
-                    })
-                    response.set_cookie('session_id', session_id, httponly=True)
-                    return response
+                    if user and check_password_hash(user[1], password):
+                        if not user[2]:  # verified
+                            return jsonify({"error": "Cuenta no verificada"}), 403
+                        
+                        session_id = create_session(email)
+                        response = jsonify({
+                            "success": True,
+                            "message": "Autenticación exitosa",
+                            "redirect": "/Pagina_principal.html"
+                        })
+                        response.set_cookie('session_id', session_id, httponly=True)
+                        return response
+                    
+                    return jsonify({"error": "Credenciales inválidas"}), 401
+            except psycopg2.Error as e:
+                print(f"Error al autenticar usuario: {e}")
+                return jsonify({"error": "Error interno del servidor"}), 500
+            finally:
+                conn.close()
         
-        return jsonify({"error": "Credenciales inválidas"}), 401
+        return jsonify({"error": "Error de conexión a la base de datos"}), 500
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -297,10 +407,10 @@ def logout():
 def check_auth():
     return jsonify({"success": True, "message": "Autenticado"})
 
-# Rutas de la aplicación
+# Rutas de la aplicación (igual que antes)
 @app.route('/')
 def home():
-    return send_from_directory('.', 'login.html')  # Mostrar login como página inicial
+    return send_from_directory('.', 'login.html')
 
 @app.route('/login.html')
 def login():
@@ -348,5 +458,5 @@ def econeural_chatbot():
 
 # Inicialización
 if __name__ == '__main__':
-    init_files()
+    init_db()
     app.run(host='0.0.0.0', port=5000, debug=True)
